@@ -18,13 +18,13 @@ Minimal syntax, maximal intent. The language is symbolic, concise, and expressiv
 
 ### Key Concepts
 |-Concept-|---------------Meaning---------------|	   
-|i_ 'x = 1;|'x|Pointer to memory containing 1|
-|''x|Dereference|Access the value at pointer 'x|
-|'3'array|Access the 4th element in pointer 'array|
-|'x\;|Explicitly release pointer 'x|
-|f('p) {}|Function: transforms memory; no return values. Only accepts references to memory|
-|f('p) {|Function declaration without definition|
-|set name{}|Namespace-like: groups related transformations|
+|i_ 'x = 1;|'x|Pointer to memory containing 1| 
+|''x|Dereference|Access the value at pointer 'x| 
+|'3'array|Access the 4th element in pointer 'array| 
+|'x\;|Explicitly release pointer 'x| 
+|f('p) {}|Function: transforms memory; no return values. Only accepts references to memory| 
+|f('p) {|Function declaration without definition| 
+|set name{}|Namespace-like: groups related transformations| 
 
 ## Example
 plaintext
