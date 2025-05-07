@@ -1,49 +1,112 @@
-i_ 'a = 1; // int a = 1; but there are no variables, only pointers to memory
+. — A Minimalist, Pointer-Centric Language
+“Do what you wish, but clean up after your existence.”
 
-''a; //dereference a to get the value at memory (there are no double pointers allowed)
+dot (.) is a low-level, expressive, minimalist programming language designed to embody clarity, control, and accountability through symbolic syntax. It compiles to clean C code, and ultimately machine code, while enforcing strict memory and scope discipline.
 
-// you don't declare arrays like variables, you declare arrays by pointing to contiguous memory
-i_ 'q 10; //int q[10];
-''q 5; //dereference q[5] to get the value of q[5], which at this point is garbage
-//^this way there's no discrepancy between the array and the pointer. there's no [] operator here, the pointer syntax remains consistent
-//somehow i need to think about how to declare which memory is allocated for the array
+✨ Core Philosophy
+Only pointers exist. There are no variables — only references to memory.
 
-// functions will work like this
-f(i_ 'x){ // pass address stored in pointer to int type, @ is almost an ancilliary type
-    //expression with local variables, but must use input somehow
-}; // function accepts 1 int when called
+Scope is sacred. You must explicitly release memory when you're done. Nothing leaks.
 
-// call the function
-f('a); // error if a is not an int pointer, or more than 1 int passed to f. at the last function call, a goes out of scope. any variables unused in the program will throw an error
+Functions don’t return. They transform what they are given — inputs are outputs.
 
-// equivalent to classes
-set name{
-    f(i_ 'x){
-        //expression with local variables, but must use input somehow. input is passed by reference using pointer notation
-        print(''x + 3); //prints value x + 3. so type mismatch will error
+Everything must justify its existence. Unused pointers? Compilation error.
+
+Minimal syntax, maximal intent. The language is symbolic, concise, and expressive.
+
+🧠 Key Concepts
+Concept	Symbol	Meaning
+i_ 'x = 1;	'x	Pointer to memory containing 1
+''x	Dereference	Access the value at pointer 'x
+'3'array	Array index	Access the 4th element in pointer 'array
+'x\;	Deinitialise	Explicitly release pointer 'x
+f(...) {}	Function	Transforms memory; no return values
+set name{}	Namespace-like	Groups related transformations
+
+📦 Example
+plaintext
+Copy
+Edit
+i_ 5'array;
+'0'array = 10;
+'1'array = 20;
+
+i_ 'sum = 0;
+
+f(i_ 'arr, i_ 'out){
+    i_ i = 0;
+    while(i < 2){
+        ''out = ''out + 'i'arr;
+        i = i + 1;
     }
-    _ l(i_ 'x, i_ 'y); // just declaration, no definition. might force specifying return type, but not sure as scope works differently. this is an example of void return syntax
 }
 
-// out of set definition is allowed if set declared like
-set name{ // open curly brace indicates definition is elsewhere, but reserve the symbol
-// add a function to the set
-name<-f(i_ 'x){
-    //expression with local variables, but must use input somehow
-}
-// then call the function
-name.f(a); // pass address stored in pointer a to int in memory. 
+f('array, 'sum);
+print(''sum);
 
-// argument order is important, so if you have a function that takes 2 arguments, you need to pass them in the right order
-name<-j(i_ 'f, i_ 'g, s_ 'k){
-    // definition, using 'f 'g and string 'k somehow
+'array\;
+'sum\;
+Transpiles to clean C:
+
+c
+Copy
+Edit
+int* array = malloc(5 * sizeof(int));
+array[0] = 10;
+array[1] = 20;
+
+int* sum = malloc(sizeof(int));
+*sum = 0;
+
+void f(int* arr, int* out) {
+    int i = 0;
+    while(i < 2){
+        *out = *out + arr[i];
+        i++;
     }
+}
 
-s_ 'ex = 'hello';
-i_ 'b = 2;
+f(array, sum);
+printf(\"%d\\n\", *sum);
+free(array);
+free(sum);
+⚙️ Compilation
+The language is compiled using .., a minimalist build tool.
 
-name.j('a, 'b, 'ex); // within the function, these addresses are assigned to local variables as in the function definition
-// might force programmer to explicitly deinitialise variables when they are no longer needed
-/a; // deinitialise a
+No headers. No imports. No macros.
+Instead, a single file (e.g., .dotbuild) defines directory structure and dependencies.
 
-# Dot
+plaintext
+Copy
+Edit
+[build]
+entry = main.dot
+dirs = src/, lib/
+
+[link]
+strict_duplicates = true
+auto_import = true
+Run:
+
+bash
+Copy
+Edit
+..
+📌 Design Goals
+🧼 Clarity: Nothing implicit. Every symbol has meaning.
+
+🧠 Discipline: You own memory. The compiler enforces it.
+
+🚀 Efficiency: Clean transpilation to C/C++ — fast, small binaries.
+
+🎭 Elegance: A symbolic language that reflects how you live and think.
+
+🔍 Status
+✅ Basic syntax and transpiler prototype complete
+🚧 Expanding function sets, conditionals, and strict validation
+🧪 Future: direct LLVM backend, REPL, .dotbuild system
+
+🤍 Creator’s Note
+dot was born from a life shaped by constraint, vigilance, and the need to leave no trace. It’s a language for those who feel their memory like a room they must clean before they leave.
+
+If this speaks to you, you're already part of it.
