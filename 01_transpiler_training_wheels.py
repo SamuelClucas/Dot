@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import re
 
-# Minimal example: transpile your language to C with training wheels (graceful mode)
+# Pointer-Oriented Programming Transpiler
+# Dogma: declare -> assign -> use -> terminate
+# Enforces minimal, graceful, and intentional code structure
 
 def transpile(source, graceful=True):
     lines = source.strip().split('\n')
@@ -16,10 +18,23 @@ def transpile(source, graceful=True):
     index_assignments = {}  # for arrays: name -> set(indexes)
     index_expectations = {}  # for arrays: name -> total_size
     lifecycle_log = []
+    unused_values = []
 
     for lineno, line in enumerate(lines):
         stripped = line.strip()
         if not stripped:
+            continue
+
+        # Ephemeral for loop parsing (comma syntax)
+        if match := re.match(r"for\s*\((.*?)\)\s*{", stripped):
+            content = match.group(1)
+            parts = [p.strip() for p in content.split(',') if p.strip()]
+            decl, cond, inc = parts if len(parts) == 3 else ("", "", "")
+            # pointer decl check
+            decl = re.sub(r"i_\s*'?(\w+)", r"int \1", decl)
+            cond = cond.replace('"', '')
+            loop = f"for ({decl}; {cond}; {inc}) {{"
+            main_body.append(loop)
             continue
 
         # Enforce semicolon rule for finality
@@ -33,14 +48,24 @@ def transpile(source, graceful=True):
             declared_ptrs[name] = lineno + 1
             index_expectations[name] = int(size)
             index_assignments[name] = set()
-            lifecycle_log.append((name, "declared", lineno + 1))
+            lifecycle_log.append((name, "declared (array)", lineno + 1))
             continue
 
-        # Scalar declaration (optional size 1): i_ 'f
+        # Scalar declaration: i_ 'f
         if match := re.match(r"i_(1)?\s*'(\w+)$", stripped):
             _, name = match.groups()
             declared_ptrs[name] = lineno + 1
-            lifecycle_log.append((name, "declared", lineno + 1))
+            lifecycle_log.append((name, "declared (scalar)", lineno + 1))
+            continue
+
+        # Ephemeral local variable (non-pointer): i_ x = 0;
+        if match := re.match(r"i_\s+(\w+)\s*=\s*(.+);", stripped):
+            name, value = match.groups()
+            if name not in used_ptrs:
+                unused_values.append((name, lineno + 1, f"i_ {name} = {value};"))
+                main_body.append(f"// i_ {name} = {value}; // unused ephemeral")
+            else:
+                main_body.append(f"int {name} = {value};")
             continue
 
         # Assign to scalar pointer: x" = val;
@@ -138,6 +163,11 @@ def transpile(source, graceful=True):
     for name, action, line in lifecycle_log:
         print(f"   - {name} {action} (line {line})")
 
+    if unused_values:
+        print("\n🧼 Cleaned Ephemerals:")
+        for name, line, code in unused_values:
+            print(f"   - Line {line}: {code}")
+
     return '\n'.join(final_output)
 
 # Sample test
@@ -147,11 +177,10 @@ f" = 4;
 i_5 'g
 g"3 = 3;
 i_4 'h;
-for (i_ i = 0; i < 4; i++) {
+for (i_ i = 0, i < 4, i++) {
     h"i = i + 1;
 }
 'h\\
 """
 
 print(transpile(source_code))
-
