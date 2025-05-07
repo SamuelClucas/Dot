@@ -1,0 +1,54 @@
+i_ 'f = 5; // int pointer to 5
+i_ 5'g; // array pointer size 5
+'2'g = 3; // set second index of 'g to int 3
+
+set add { // renamed references to demonstrate they modify 'g and 'f but are themselves representations of the same thing
+  addInts(i_ 5'a, i_ 'k){
+    i_ ''a = '2'a + ''k;
+    }
+}
+
+add.addInts('g, 'f)
+'g\
+
+''f; // should evaluate to 8
+
+'f\
+
+// This is a simple example of a dot file that demonstrates the use of pointers and arrays in a programming language.
+// The code defines a pointer to an integer, an array pointer, and a function that adds two integers.
+// The function is then called with the array pointer and the integer pointer, and the result is printed.
+// The code uses a custom syntax for defining pointers and arrays, which is not standard in most programming languages.
+// The code also includes comments that explain the purpose of each line and the overall structure of the code.
+// The code is not meant to be executed as is, but rather serves as a demonstration of the concepts of pointers and arrays in programming.
+
+i_ 'f // declare, no ; as it is a placeholder for a later assignment by f" = 4; for example
+i_1 'f // declare alternative: also valid declaration, shouldn't throw an error, but should be discouraged to maintain readability (ease of distinction between array and single pointer)
+f" = 4; // assign
+f"0 = 4; // also valid assignment, shouldn't throw an error, but should be discouraged to maintain readability (ease of distinction between array and single pointer)
+
+i_ k" = 4; // assign and declare all in one line
+
+i_5 'g // declare array pointer 'g of size 5. no ; indicates to the compiler it has buffer behaviour, i.e. you may not assign to each index, but compiler requires that at least one address is assigned to, and of course it must be fully deinitialised when no longer in use
+g"3 = 3; // assign int 3 to index 3 of array 'g
+
+i_4 'h; // you have declared an array in one line, indicating all indices are to be assigned to. compiler won't throw and error, but removes the ; and lists the change in the traning wheels output if not all indices are used at some point in the program
+
+for (i_ i = 0; i < 5; i++) { // may pass your own pointer to the for loop, but it will be treated as a pointer to an int, not a pointer to a pointer and must follow the i" convention, since its lifetime is beyond the scope of for();
+  h"i = 1; // assign int 1 to index i of array 'g. no training wheels output, since all indices have been assigned to
+} 
+
+i_4 z"0, 1, 2, 3 = 3, 6, 2, 4; // must terminate with ; since all indices are assigned to
+
+i_3 z"1, 2 = 3, 6 // no ;, it has buffer behaviour as of yet. ; should only be used when all indices have been assigned to once
+z"0 = 1; // terminate with ; since all indices have been assigned to
+ 
+i_3 t"0 = 1
+
+t"2 = 3
+
+// later
+t"2 = 1; // training wheels will assign ; here if not present (if you think it's a good idea)
+
+//CENTRAL DOGMA:
+// Declare -> Assign -> Use -> Terminate scope
