@@ -10,10 +10,12 @@ def transpile(source, graceful=True):
     main_body = []
     declared_ptrs = {}  # name: line_number
     assigned_ptrs = set()
+    used_ptrs = set()
     freed_ptrs = set()
     auto_frees = []
     index_assignments = {}  # for arrays: name -> set(indexes)
     index_expectations = {}  # for arrays: name -> total_size
+    lifecycle_log = []
 
     for lineno, line in enumerate(lines):
         stripped = line.strip()
@@ -31,18 +33,21 @@ def transpile(source, graceful=True):
             declared_ptrs[name] = lineno + 1
             index_expectations[name] = int(size)
             index_assignments[name] = set()
+            lifecycle_log.append((name, "declared", lineno + 1))
             continue
 
         # Scalar declaration (optional size 1): i_ 'f
         if match := re.match(r"i_(1)?\s*'(\w+)$", stripped):
             _, name = match.groups()
             declared_ptrs[name] = lineno + 1
+            lifecycle_log.append((name, "declared", lineno + 1))
             continue
 
         # Assign to scalar pointer: x" = val;
         if match := re.match(r"(\w+)\"\s*=\s*(.+);", stripped):
             name, value = match.groups()
             assigned_ptrs.add(name)
+            lifecycle_log.append((name, "assigned", lineno + 1))
             main_body.append(f"*{name} = {value};")
             continue
 
@@ -50,18 +55,23 @@ def transpile(source, graceful=True):
         if match := re.match(r"(\w+)\"(\d+)\s*=\s*(.+);", stripped):
             name, index, value = match.groups()
             index_assignments.setdefault(name, set()).add(int(index))
+            lifecycle_log.append((name, f"assigned index {index}", lineno + 1))
             main_body.append(f"{name}[{index}] = {value};")
             continue
 
         # Print scalar: x";
         if match := re.match(r"(\w+)\";$", stripped):
             name = match.group(1)
+            used_ptrs.add(name)
+            lifecycle_log.append((name, "used", lineno + 1))
             main_body.append(f"printf(\"%d\\n\", *{name});")
             continue
 
         # Print array index: x"n;
         if match := re.match(r"(\w+)\"(\d+);$", stripped):
             name, index = match.groups()
+            used_ptrs.add(name)
+            lifecycle_log.append((name, f"used index {index}", lineno + 1))
             main_body.append(f"printf(\"%d\\n\", {name}[{index}]);")
             continue
 
@@ -69,6 +79,7 @@ def transpile(source, graceful=True):
         if match := re.match(r"'(\w+)\\\\", stripped):
             name = match.group(1)
             freed_ptrs.add(name)
+            lifecycle_log.append((name, "freed", lineno + 1))
             main_body.append(f"free({name});")
             continue
 
@@ -93,6 +104,9 @@ def transpile(source, graceful=True):
         if match := re.match(r"f\((.*?)\);", stripped):
             args = match.group(1).replace("'", "").split(',')
             args = [arg.strip() for arg in args]
+            for arg in args:
+                used_ptrs.add(arg)
+                lifecycle_log.append((arg, "used (call)", lineno + 1))
             main_body.append(f"f({', '.join(args)});")
             continue
 
@@ -103,6 +117,7 @@ def transpile(source, graceful=True):
             if ptr not in freed_ptrs:
                 main_body.append(f"free({ptr}); // training wheels")
                 auto_frees.append((ptr, line))
+                lifecycle_log.append((ptr, "auto-freed (training wheels)", line))
 
         for name, total in index_expectations.items():
             assigned = index_assignments.get(name, set())
@@ -118,6 +133,10 @@ def transpile(source, graceful=True):
         for ptr, line in auto_frees:
             print(f"   - Line {line}: '{ptr}\\")
         print("\n🧠 Tip: Add these manually in your .dot file to remove warnings.")
+
+    print("\n📘 Symbol Lifecycle Summary:")
+    for name, action, line in lifecycle_log:
+        print(f"   - {name} {action} (line {line})")
 
     return '\n'.join(final_output)
 
@@ -135,3 +154,4 @@ for (i_ i = 0; i < 4; i++) {
 """
 
 print(transpile(source_code))
+
