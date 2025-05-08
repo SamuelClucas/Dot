@@ -1,186 +1,158 @@
 #!/usr/bin/env python3
+# Updated transpile_line to support the new parameter rule:
+# Function definitions use , for writable references, . for const
+# Function calls use ; for writable refs, : for const
+# Definitions must end their param list with , or . even for one param
 import re
+from pathlib import Path
+from glob import glob
+from os import makedirs
 
-# Pointer-Oriented Programming Transpiler
-# Dogma: declare -> assign -> use -> terminate
-# Enforces minimal, graceful, and intentional code structure
+# === Shared State ===
+transpiled_lines = []
+training_wheels = []
+line_map = []
 
-def transpile(source, graceful=True):
-    lines = source.strip().split('\n')
-    output = ["#include <stdio.h>", "#include <stdlib.h>", ""]
-    functions = []
-    main_body = []
-    declared_ptrs = {}  # name: line_number
-    assigned_ptrs = set()
-    used_ptrs = set()
-    freed_ptrs = set()
-    auto_frees = []
-    index_assignments = {}  # for arrays: name -> set(indexes)
-    index_expectations = {}  # for arrays: name -> total_size
-    lifecycle_log = []
-    unused_values = []
+# === Patterns ===
+STRING_DECL = re.compile(r"s_ ([a-zA-Z_]\w*)\" *= *(.*):")
+PTR_DECL = re.compile(r"i_ *'([a-zA-Z_]\w*)")
+HEAP_DECL = re.compile(r"i~ *'([a-zA-Z_]\w*)")
+CONST_PTR = re.compile(r"i_ *([a-zA-Z_]\w*)\s*=.*?:")
+EPHEMERAL = re.compile(r"i_ (?!').*[^,:]\s*$")
+PRINT_EXPR = re.compile(r'p"(.+)"?')
+DEREF_EXPR = re.compile(r"([a-zA-Z_]\w*)\"(\d*)")
+FREE_PTR = re.compile(r"~?([a-zA-Z_]\w*)\\")
+SET_DEF = re.compile(r"set ([a-zA-Z_]\w*)\(\)\s*{")
+FUNC_DEF = re.compile(r"([a-zA-Z_]\w*)\((.*)\)\s*{")
+CALL_EXPR = re.compile(r"([a-zA-Z_]\w*)\.([a-zA-Z_]\w*)\((.*)\)")
 
-    for lineno, line in enumerate(lines):
-        stripped = line.strip()
-        if not stripped:
-            continue
 
-        # Ephemeral for loop parsing (comma syntax)
-        if match := re.match(r"for\s*\((.*?)\)\s*{", stripped):
-            content = match.group(1)
-            parts = [p.strip() for p in content.split(',') if p.strip()]
-            decl, cond, inc = parts if len(parts) == 3 else ("", "", "")
-            # pointer decl check
-            decl = re.sub(r"i_\s*'?(\w+)", r"int \1", decl)
-            cond = cond.replace('"', '')
-            loop = f"for ({decl}; {cond}; {inc}) {{"
-            main_body.append(loop)
-            continue
+def transpile_line_refined(line, line_num):
+    code = line.strip()
+    if not code or code.startswith("//"):
+        return line
 
-        # Enforce semicolon rule for finality
-        if not (stripped.endswith(';') or stripped.endswith('{') or stripped.endswith('}') or stripped.endswith('\\')):
-            print(f"❌ Syntax warning on line {lineno + 1}: missing semicolon or improper line ending")
-            print(f"   → {stripped}")
+    # Ephemeral misuse
+    if EPHEMERAL.match(code):
+        training_wheels.append(f"⚠️ Line {line_num+1}: ephemeral must end with `,`")
+        return f"// {line}"
 
-        # Array declaration: i_5 'g
-        if match := re.match(r"i_(\d+)\s*'(\w+)$", stripped):
-            size, name = match.groups()
-            declared_ptrs[name] = lineno + 1
-            index_expectations[name] = int(size)
-            index_assignments[name] = set()
-            lifecycle_log.append((name, "declared (array)", lineno + 1))
-            continue
+    # Const pointer
+    if CONST_PTR.search(code):
+        var = CONST_PTR.search(code).group(1)
+        training_wheels.append(f"🔒 Const '{var}' declared on line {line_num+1}")
+        return code.replace(f"i_ {var} =", f"const int {var} =").replace(":", "")
 
-        # Scalar declaration: i_ 'f
-        if match := re.match(r"i_(1)?\s*'(\w+)$", stripped):
-            _, name = match.groups()
-            declared_ptrs[name] = lineno + 1
-            lifecycle_log.append((name, "declared (scalar)", lineno + 1))
-            continue
+    # Heap allocation
+    if HEAP_DECL.search(code):
+        var = HEAP_DECL.search(code).group(1)
+        training_wheels.append(f"💡 Heap pointer '{var}' declared on line {line_num+1}, remember to free with ~{var}\\")
+        return f"int* {var} = (int*)malloc(sizeof(int));"
 
-        # Ephemeral local variable (non-pointer): i_ x = 0;
-        if match := re.match(r"i_\s+(\w+)\s*=\s*(.+);", stripped):
-            name, value = match.groups()
-            if name not in used_ptrs:
-                unused_values.append((name, lineno + 1, f"i_ {name} = {value};"))
-                main_body.append(f"// i_ {name} = {value}; // unused ephemeral")
-            else:
-                main_body.append(f"int {name} = {value};")
-            continue
+    # Heap or stack free
+    if FREE_PTR.match(code):
+        var = FREE_PTR.match(code).group(1)
+        return f"free({var});"
 
-        # Assign to scalar pointer: x" = val;
-        if match := re.match(r"(\w+)\"\s*=\s*(.+);", stripped):
-            name, value = match.groups()
-            assigned_ptrs.add(name)
-            lifecycle_log.append((name, "assigned", lineno + 1))
-            main_body.append(f"*{name} = {value};")
-            continue
+    # Pointer declaration
+    if PTR_DECL.search(code):
+        var = PTR_DECL.search(code).group(1)
+        return code.replace(f"i_ '{var}", f"int* {var}")
 
-        # Assign to array index: x"i = val;
-        if match := re.match(r"(\w+)\"(\d+)\s*=\s*(.+);", stripped):
-            name, index, value = match.groups()
-            index_assignments.setdefault(name, set()).add(int(index))
-            lifecycle_log.append((name, f"assigned index {index}", lineno + 1))
-            main_body.append(f"{name}[{index}] = {value};")
-            continue
+    # String declaration
+    if STRING_DECL.match(code):
+        var, val = STRING_DECL.match(code).groups()
+        return f'std::string {var} = {val};'
 
-        # Print scalar: x";
-        if match := re.match(r"(\w+)\";$", stripped):
-            name = match.group(1)
-            used_ptrs.add(name)
-            lifecycle_log.append((name, "used", lineno + 1))
-            main_body.append(f"printf(\"%d\\n\", *{name});")
-            continue
+    # Print command
+    if PRINT_EXPR.match(code):
+        expr = PRINT_EXPR.match(code).group(1)
+        return f'std::cout << {expr} << std::endl;'
 
-        # Print array index: x"n;
-        if match := re.match(r"(\w+)\"(\d+);$", stripped):
-            name, index = match.groups()
-            used_ptrs.add(name)
-            lifecycle_log.append((name, f"used index {index}", lineno + 1))
-            main_body.append(f"printf(\"%d\\n\", {name}[{index}]);")
-            continue
+    # Dereference expression used alone (e.g. name")
+    if DEREF_EXPR.match(code) and code.endswith('"'):
+        var, index = DEREF_EXPR.match(code).groups()
+        if index:
+            return f'std::cout << {var}[{index}] << std::endl;'
+        else:
+            return f'std::cout << *{var} << std::endl;'
 
-        # Deinitialisation: 'x\
-        if match := re.match(r"'(\w+)\\\\", stripped):
-            name = match.group(1)
-            freed_ptrs.add(name)
-            lifecycle_log.append((name, "freed", lineno + 1))
-            main_body.append(f"free({name});")
-            continue
+    # set block
+    if SET_DEF.match(code):
+        set_name = SET_DEF.match(code).group(1)
+        return f'namespace {set_name} {{'
 
-        # Function declaration: f(...) {
-        if match := re.match(r"f\((.*?)\)\s*{", stripped):
-            params = match.group(1).split(',')
-            cparams = []
-            for p in params:
-                p = p.strip()
-                if "'" in p:
-                    cparams.append(f"int* {p.split("'")[1]}")
+    # function definition
+    if FUNC_DEF.match(code):
+        fname, args = FUNC_DEF.match(code).groups()
+        arglist = []
+        if args.strip():
+            for sep in [",", "."]:
+                if sep in args:
+                    parts = [a.strip() for a in args.split(sep) if a.strip()]
+                    for part in parts:
+                        if "s_" in part and "'" in part:
+                            var = part.split("'")[1]
+                            base = f"std::string* {var}"
+                        elif "i_" in part and "'" in part:
+                            var = part.split("'")[1]
+                            base = f"int* {var}"
+                        if sep == ".":
+                            base = f"const {base}"
+                        arglist.append(base)
+        return f'void {fname}({", ".join(arglist)}) {{'
+
+    # function call with ; and :
+    if CALL_EXPR.match(code):
+        namespace, func, args = CALL_EXPR.match(code).groups()
+        arglist = []
+        for a in re.split(r"[;:]", args):
+            a = a.strip().replace("'", "")
+            if a:
+                arglist.append(a)
+        return f"{namespace}::{func}({', '.join(arglist)});"
+
+    return code
+
+# Re-transpile using refined symbol rule
+def transpile_dot_file_refined(dot_path):
+    transpiled_lines.clear()
+    training_wheels.clear()
+    line_map.clear()
+
+    inside_main = []
+    outside_main = []
+
+    with open(dot_path) as f:
+        for line_num, line in enumerate(f):
+            line_map.append(line)
+            cpp = transpile_line_refined(line, line_num)
+            if cpp:
+                # Keep definitions outside of main
+                if cpp.startswith("namespace") or cpp.startswith("void") or cpp.startswith("std::string") or cpp.startswith("#") or cpp.startswith("}") or cpp.startswith("free("):
+                    outside_main.append(cpp)
                 else:
-                    cparams.append(f"int {p.split('_')[1]}")
-            functions.append(f"void f({', '.join(cparams)}) {{")
-            continue
+                    inside_main.append(cpp)
 
-        if stripped == "}":
-            functions.append("}")
-            continue
+    return "\n".join([
+        "#include <iostream>",
+        "#include <string>",
+        "#include <cstdlib>",
+        ""
+    ] + outside_main + [
+        "",
+        "int main() {"
+    ] + [f"    {l}" for l in inside_main] + [
+        "    return 0;",
+        "}"
+    ])
 
-        # Function call: f('a, 'b);
-        if match := re.match(r"f\((.*?)\);", stripped):
-            args = match.group(1).replace("'", "").split(',')
-            args = [arg.strip() for arg in args]
-            for arg in args:
-                used_ptrs.add(arg)
-                lifecycle_log.append((arg, "used (call)", lineno + 1))
-            main_body.append(f"f({', '.join(args)});")
-            continue
+# Run refined transpilation
+dot_path = "src/hello_world.dot"
+refined_cpp_output = transpile_dot_file_refined(dot_path)
+refined_output_path = "build/hello_world_refined.cpp"
 
-        main_body.append(f"// Unrecognized or raw: {stripped}")
+with open(refined_output_path, "w") as f:
+    f.write(refined_cpp_output)
 
-    if graceful:
-        for ptr, line in declared_ptrs.items():
-            if ptr not in freed_ptrs:
-                main_body.append(f"free({ptr}); // training wheels")
-                auto_frees.append((ptr, line))
-                lifecycle_log.append((ptr, "auto-freed (training wheels)", line))
-
-        for name, total in index_expectations.items():
-            assigned = index_assignments.get(name, set())
-            if len(assigned) < total:
-                print(f"⚠️ Partial array '{name}' not fully assigned")
-                missing = set(range(total)) - assigned
-                print(f"   - Missing indices: {sorted(missing)}")
-
-    final_output = output + functions + ["", "int main() {"] + main_body + ["    return 0;", "}"]
-
-    if graceful and auto_frees:
-        print("\n⚠️ Training wheels added (auto-deinitialised pointers):")
-        for ptr, line in auto_frees:
-            print(f"   - Line {line}: '{ptr}\\")
-        print("\n🧠 Tip: Add these manually in your .dot file to remove warnings.")
-
-    print("\n📘 Symbol Lifecycle Summary:")
-    for name, action, line in lifecycle_log:
-        print(f"   - {name} {action} (line {line})")
-
-    if unused_values:
-        print("\n🧼 Cleaned Ephemerals:")
-        for name, line, code in unused_values:
-            print(f"   - Line {line}: {code}")
-
-    return '\n'.join(final_output)
-
-# Sample test
-source_code = """
-i_ 'f
-f" = 4;
-i_5 'g
-g"3 = 3;
-i_4 'h;
-for (i_ i = 0, i < 4, i++) {
-    h"i = i + 1;
-}
-'h\\
-"""
-
-print(transpile(source_code))
+refined_output_path
