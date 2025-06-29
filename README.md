@@ -33,7 +33,7 @@
 ## Example
 
 ```dot
-i_ 5'array;
+i_5 'array; // array of 5 ints
 array"0 = 10;
 array"2 = 20;
 
@@ -52,6 +52,7 @@ sum" // minimalist print statement
 
 'array\
 'sum\
+```
 
 Transpiles to:
 
@@ -62,10 +63,10 @@ array[1] = 20;
 int* sum = malloc(sizeof(int));
 *sum = 0;
 
-void f(int* arr, int* out) {
+void f(i_ @arr, i_ @out) {
     int i = 0;
     while(i < 2){
-        *out = *out + arr[i];
+        out@ = out@ + arr@i;
         i++;
     }
 }
@@ -75,7 +76,9 @@ printf("%d\n", *sum);
 free(array);
 free(sum);
 
-Compilation
+
+## Compilation
+
 Dot is compiled using .., a minimalist build tool.
 
 No headers. No macros. No includes.
@@ -90,17 +93,17 @@ dirs = src/, lib/
 strict_duplicates = true
 auto_import = true
 
-Design Goals
+## Design Goals
 
-Clarity: Every symbol has explicit meaning.
+- Clarity: Every symbol has explicit meaning.
 
-Discipline: You own memory. The compiler enforces it.
+- Discipline: You own memory. The compiler enforces it.
 
-Efficiency: Fast, lean, transpiled C/C++ code.
+- Efficiency: Fast, lean, transpiled C/C++ code.
 
-Scope autonomy: You wield control. Scope doesn’t own you.
+- Scope autonomy: You wield control. Scope doesn’t own you.
 
-Project Structure
+## Project Structure
 
 .
 ├── archive                # Older transpiler experiments
@@ -122,7 +125,7 @@ Project Structure
     ├── lexer.py          # Token class system-based lexer
     └── parser.py         # [TODO] AST parser
 
-Status
+## Status
 
  Token-based lexer implemented (src/lexer.py)
 
