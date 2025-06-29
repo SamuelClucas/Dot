@@ -105,7 +105,27 @@ auto_import = true
 
 ## Project Structure
 
-<pre lang="md"><code>. ├── archive/ # Older transpiler experiments │ ├── 01_transpiler_training_wheels.py # First transpiler MVP │ ├── dot_transpiler_cpp.py # Partial prototype with C++ syntax │ ├── dotc.py # Draft CLI entry point │ └── tokenizer.py # Legacy lexer with regex ├── dotLang.pdf # Design document: syntax, philosophy, examples ├── examples/ # Demonstrations and syntax showcases │ ├── hello_world.dot # Minimal example program │ ├── legacy.md # Notes from early iterations │ └── sample.rtf # Archived scratchpad / sketches ├── LICENSE ├── README.md # You're here └── src/ # Core compiler modules ├── dotc.py # [DOING] Main CLI compiler stub ├── emitter.py # [TODO] C/C++ code generation backend ├── ir.py # [TODO] Intermediate Representation layer ├── lexer.py # Token class system-based lexer └── parser.py # [TODO] AST parser </code></pre>
+<pre lang="md"><code>
+    . 
+    ├── archive/ # Older transpiler experiments 
+    │     ├── 01_transpiler_training_wheels.py # First transpiler MVP 
+    │     ├── dot_transpiler_cpp.py # Partial prototype with C++ syntax 
+    │     ├── dotc.py # Draft CLI entry point 
+    │     └── tokenizer.py # Legacy lexer with regex 
+    ├── dotLang.pdf # Design document: syntax, philosophy, examples 
+    ├── examples/ # Demonstrations and syntax showcases 
+    │     ├── hello_world.dot # Minimal example program 
+    │     ├── legacy.md # Notes from early iterations 
+    │     └── sample.rtf # Archived scratchpad / sketches 
+    ├── LICENSE 
+    ├── README.md # You're here 
+    └── src/ # Core compiler modules 
+        ├── dotc.py # [DOING] Main CLI compiler stub 
+        ├── emitter.py # [TODO] C/C++ code generation backend 
+        ├── ir.py # [TODO] Intermediate Representation layer 
+        ├── lexer.py # Token class system-based lexer 
+        └── parser.py # [TODO] AST parser 
+</code></pre>
 
 ## Status
 
