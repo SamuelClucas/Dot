@@ -55,7 +55,7 @@ sum" // minimalist print statement
 ```
 
 Transpiles to:
-
+```c
 int* array = malloc(5 * sizeof(int));
 array[0] = 10;
 array[1] = 20;
@@ -75,7 +75,7 @@ f(array, sum);
 printf("%d\n", *sum);
 free(array);
 free(sum);
-
+```
 
 ## Compilation
 
