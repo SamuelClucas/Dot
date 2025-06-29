@@ -1,0 +1,39 @@
+struct_vec(i_ 'x, i_ 'y)        // Declare a vec_ struct with two int pointers
+
+i_ x" = 10;                     // Declare and assign x"
+i_ y" = 5;
+
+set_i math {                    // Create a set 'math' for integer operations
+    add(i_ @a, i_ @b) {         // 'add' transforms @a in place using @b
+        a@ = a@ + b@;           // '@' denotes pseudo-pointers (non-ephemerals)
+    }
+
+    is_even(i_ n, bool_ @div) { // 'is_even' writes result to @div
+        div@ = n % 2;           // '%' is modulo (still concise!)
+    }
+}
+
+set_i telemetry {               // Create a telemetry set for logging ints
+    send(i_ @x) {
+        "Telemetry: " x@        // Concise print — no parentheses, string concat
+    }
+}
+
+vec_ point(x", y");            // Assign x", y" to point.x", point.y"
+
+math.add('x, 'y);              // Add 'x and 'y — result stored back in 'x
+
+'x\ 'y\                        // Explicitly free 'x and 'y
+
+bool 'div;                    // Declare a boolean pointer 'div
+math.is_even(point.x", 'div); // Test if x is even, write result to 'div
+
+if(div") {                    // if div" == true (dereferenced value)
+    telemetry.send(point.x')   // Log telemetry
+}
+
+'div\                          // Free 'div
+
+$_ t" = telemetry.send(point.x') // Maybe $_ was meant as "discard result"?
+
+point\                         // Free the point struct (assuming it owns x", y")

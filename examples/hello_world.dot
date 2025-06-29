@@ -1,0 +1,50 @@
+set_s greet(){ // restricted to s type
+    world(s_ @name.){ // . means const, consts come after all , in signaturw
+        name@
+    } 
+}
+
+s_ string" = "Hello, world!": // : indicates const declaration
+greet.world('string.) // no ; after ) as only single const arg passed, so no non-ephemeral memory is being modified
+
+'string\ // you may terminate const if no longer used
+
+set_i math{
+    max_of(i_5 @arr, i_ @max) { // pseudo is @
+    max@ = arr@0; // must end in ;, you're modifying a non ephemeral outside the function {}
+    }
+}
+
+set_i one{
+    f(i_ @a){
+        //definition
+        a@++;
+    }
+} //sets with type restrictions
+
+set_i_s two{    // multi-type set
+    g(i_ @a, s_ @g){} // takes i_ and s_
+    k(i_ @a) {} // only accepts i_ type
+}
+
+struct_i vec{
+    i_ 'x; // members are non-ephemerals in themselves
+    i_ 'y; // no ephemerals allowed they die by }
+}
+
+~struct_i vec{ //not overwriting vec, as heap ~ type
+    i_ 'x;
+    i_ 'y;
+}
+
+vec_i point{x" = 2, y" = 3};
+~vec_i point{x" = 2, y" = 3};
+
+~point" += point"; // like bit or merge, wraps or duplicates if different number of members
+// i just used heap here to show you can clarify between identically named structs and instances if one is on the heap and the other isn't, because they are treated like distinct symbols
+
+// using the set from earlier
+
+point"x.one.f();
+// equivalent notation is
+one.f(point"x) // prints 3
