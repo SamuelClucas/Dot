@@ -43,7 +43,7 @@ f(i_ @arr, i_ @out){
     i_ i = 0,
     while(i < 2){
         out@ = out@ + arr@i;
-        i = i + 1,
+        i = i + 1
     }
 }
 
