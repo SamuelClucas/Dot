@@ -1,5 +1,6 @@
 # `.`  
 ### A Minimalist, Pointer-Centric Language
+## 🧪 v0.1.0-alpha
 
 > “Do what you wish, but clean up after your existence.”
 
